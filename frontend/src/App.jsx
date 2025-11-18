@@ -1,0 +1,207 @@
+import { useState } from "react";
+
+const API_URL = import.meta.env.VITE_API_URL; // viene de .env.local
+
+function App() {
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    setFile(f);
+    setResult(null);
+    setError(null);
+
+    const url = URL.createObjectURL(f);
+    setPreview(url);
+  };
+
+  const fileToBase64 = (f) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        // incluye "data:image/jpeg;base64,...."
+        resolve(reader.result);
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(f);
+    });
+
+  const handleSend = async () => {
+    if (!file) {
+      setError("Primero selecciona una imagen de billete.");
+      return;
+    }
+    if (!API_URL) {
+      setError("No está configurada la URL de la API (VITE_API_URL).");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const base64 = await fileToBase64(file);
+
+      const resp = await fetch(`${API_URL}/predict-billete-base64`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          image_base64: base64, // tu backend acepta data:image/... o solo base64
+        }),
+      });
+
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.detail || `Error HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      setResult(data);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Error al contactar la API.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "#0f172a",
+        color: "#e5e7eb",
+        padding: "1rem",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "480px",
+          width: "100%",
+          background: "#111827",
+          borderRadius: "16px",
+          padding: "1.5rem",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.5)",
+          border: "1px solid #1f2937",
+        }}
+      >
+        <h1 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
+          Clasificador de Billetes
+        </h1>
+        <p style={{ fontSize: "0.9rem", color: "#9ca3af", marginBottom: "1rem" }}>
+          Sube una imagen de un billete y el modelo te dirá si es <b>apto</b> o{" "}
+          <b>no apto</b>.
+        </p>
+
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"  // intenta usar cámara trasera en móviles
+          onChange={handleFileChange}
+          style={{ marginBottom: "1rem" }}
+        />
+
+        {preview && (
+          <div
+            style={{
+              marginBottom: "1rem",
+              borderRadius: "12px",
+              overflow: "hidden",
+              border: "1px solid #374151",
+            }}
+          >
+            <img
+              src={preview}
+              alt="Preview billete"
+              style={{
+                width: "100%",
+                display: "block",
+                maxHeight: "260px",
+                objectFit: "cover",
+              }}
+            />
+          </div>
+        )}
+
+        <button
+          onClick={handleSend}
+          disabled={loading || !file}
+          style={{
+            width: "100%",
+            padding: "0.75rem",
+            borderRadius: "999px",
+            border: "none",
+            fontSize: "1rem",
+            fontWeight: "600",
+            cursor: loading || !file ? "not-allowed" : "pointer",
+            background: loading || !file ? "#4b5563" : "#22c55e",
+            color: "#111827",
+            marginBottom: "1rem",
+          }}
+        >
+          {loading ? "Analizando..." : "Analizar billete"}
+        </button>
+
+        {error && (
+          <div
+            style={{
+              background: "#7f1d1d",
+              color: "#fee2e2",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              fontSize: "0.85rem",
+              marginBottom: "0.5rem",
+            }}
+          >
+            ⚠️ {error}
+          </div>
+        )}
+
+        {result && (
+          <div
+            style={{
+              background: "#022c22",
+              borderRadius: "12px",
+              padding: "1rem",
+              border: "1px solid #064e3b",
+            }}
+          >
+            <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>Resultado</div>
+            <div
+              style={{
+                fontSize: "1.4rem",
+                fontWeight: "700",
+                marginTop: "0.25rem",
+              }}
+            >
+              {result.clase?.toUpperCase()}
+            </div>
+            <div
+              style={{
+                marginTop: "0.5rem",
+                fontSize: "0.9rem",
+                color: "#a7f3d0",
+              }}
+            >
+              Confianza:{" "}
+              <b>{(result.confianza * 100).toFixed(2)}%</b>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
