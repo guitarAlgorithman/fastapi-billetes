@@ -1,0 +1,80 @@
+###########################################################
+#                 PYTHON / FASTAPI
+###########################################################
+
+# Bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+env/
+venv/
+.venv/
+.env
+*.env
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# Logs
+*.log
+
+###########################################################
+#                        MODELOS
+###########################################################
+
+# Modelos y pesos IA (solo si NO quieres subirlos al repo)
+# Si quieres subir modelo_billetes.pt, quita esta línea ↓
+*.pt
+*.pth
+
+# Carpeta de datasets locales
+data/
+datasets/
+outputs/
+checkpoints/
+
+###########################################################
+#                        DOCKER
+###########################################################
+
+# Archivos temporales de Docker
+*.tar
+*.bak
+
+###########################################################
+#                        NODE / REACT
+###########################################################
+
+# Node modules
+node_modules/
+
+# Dist output
+dist/
+build/
+
+# Temp files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+###########################################################
+#                        MISC
+###########################################################
+
+.DS_Store
+Thumbs.db
