@@ -1,23 +1,28 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Dependencias de sistema mínimas (torch + torchvision a veces las necesitan)
+# 1) Instalamos dependencias de sistema mínimas
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# Instalar dependencias de Python
-COPY requirements.txt .
+# 2) Copiamos requirements del backend e instalamos
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar código y modelo
-COPY . .
+# 3) Copiamos el backend completo (incluye main.py y modelo_billetes.pt)
+COPY backend/ .
+
+# Railway setea $PORT. Si no existe, usamos 8000 (para correr local).
+ENV PORT=8000
 
 EXPOSE 8000
 
-# Comando para levantar FastAPI
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 4) Usar el PORT de Railway, no hardcodear 8000
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+# si quieres ser más explícito:
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
