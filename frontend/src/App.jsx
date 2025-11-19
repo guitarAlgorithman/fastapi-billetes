@@ -1,23 +1,68 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import Cropper from "react-easy-crop";
+import getCroppedImg from "./cropImage";
 
 const API_URL = import.meta.env.VITE_API_URL; // viene de .env.local
 
 function App() {
-  const [file, setFile] = useState(null);
-  const [preview, setPreview] = useState(null);
+  const [file, setFile] = useState(null);           // archivo final (recortado)
+  const [preview, setPreview] = useState(null);     // preview actual (original o recortado)
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Estados para recorte
+  const [isCropping, setIsCropping] = useState(false);
+  const [originalImageUrl, setOriginalImageUrl] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  const onCropComplete = useCallback((_, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
   const handleFileChange = (e) => {
     const f = e.target.files[0];
     if (!f) return;
-    setFile(f);
+
+    // Limpiar estado previo
     setResult(null);
     setError(null);
 
     const url = URL.createObjectURL(f);
+
+    // Guardamos la imagen original para recortar
+    setOriginalImageUrl(url);
     setPreview(url);
+    setIsCropping(true);   // activamos modo recorte
+    setFile(null);         // aún no tenemos archivo final
+  };
+
+  const aplicarRecorte = async () => {
+    try {
+      if (!originalImageUrl || !croppedAreaPixels) {
+        setError("No se pudo obtener el área de recorte.");
+        return;
+      }
+
+      const croppedBlob = await getCroppedImg(originalImageUrl, croppedAreaPixels);
+
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      setPreview(croppedUrl);  // mostrar el recorte final
+
+      // Creamos un File desde el blob recortado
+      const croppedFile = new File([croppedBlob], "billete_recortado.jpg", {
+        type: "image/jpeg",
+      });
+      setFile(croppedFile);
+
+      // Salimos del modo recorte
+      setIsCropping(false);
+    } catch (err) {
+      console.error(err);
+      setError("Error al recortar la imagen.");
+    }
   };
 
   const fileToBase64 = (f) =>
@@ -33,7 +78,7 @@ function App() {
 
   const handleSend = async () => {
     if (!file) {
-      setError("Primero selecciona una imagen de billete.");
+      setError("Primero toma la foto, recorta el billete y luego analiza.");
       return;
     }
     if (!API_URL) {
@@ -100,19 +145,77 @@ function App() {
           Clasificador de Billetes
         </h1>
         <p style={{ fontSize: "0.9rem", color: "#9ca3af", marginBottom: "1rem" }}>
-          Sube una imagen de un billete y el modelo te dirá si es <b>apto</b> o{" "}
-          <b>no apto</b>.
+          Toma una foto del billete, recórtalo para enmarcarlo bien y el modelo te dirá
+          si es <b>apto</b> o <b>no apto</b>.
         </p>
 
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"  // intenta usar cámara trasera en móviles
-          onChange={handleFileChange}
-          style={{ marginBottom: "1rem" }}
-        />
+        {/* Input de imagen */}
+        {!isCropping && (
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"  // intenta usar cámara trasera en móviles
+            onChange={handleFileChange}
+            style={{ marginBottom: "1rem" }}
+          />
+        )}
 
-        {preview && (
+        {/* Zona de recorte */}
+        {isCropping && originalImageUrl && (
+          <div style={{ marginBottom: "1rem" }}>
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: 300,
+                background: "#000",
+                borderRadius: "12px",
+                overflow: "hidden",
+              }}
+            >
+            <Cropper
+              image={originalImageUrl}
+              crop={crop}
+              zoom={zoom}
+              aspect={2.11} // relación REAL del billete chileno (148mm / 70mm)
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+            />
+            </div>
+            <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+            </div>
+            <button
+              onClick={aplicarRecorte}
+              style={{
+                marginTop: "0.75rem",
+                width: "100%",
+                padding: "0.6rem",
+                borderRadius: "999px",
+                border: "none",
+                fontSize: "0.95rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                background: "#22c55e",
+                color: "#111827",
+              }}
+            >
+              Usar recorte
+            </button>
+          </div>
+        )}
+
+        {/* Preview final (recortado) */}
+        {preview && !isCropping && (
           <div
             style={{
               marginBottom: "1rem",
@@ -134,9 +237,10 @@ function App() {
           </div>
         )}
 
+        {/* Botón de análisis */}
         <button
           onClick={handleSend}
-          disabled={loading || !file}
+          disabled={loading || !file || isCropping}
           style={{
             width: "100%",
             padding: "0.75rem",
@@ -144,8 +248,9 @@ function App() {
             border: "none",
             fontSize: "1rem",
             fontWeight: "600",
-            cursor: loading || !file ? "not-allowed" : "pointer",
-            background: loading || !file ? "#4b5563" : "#22c55e",
+            cursor: loading || !file || isCropping ? "not-allowed" : "pointer",
+            background:
+              loading || !file || isCropping ? "#4b5563" : "#22c55e",
             color: "#111827",
             marginBottom: "1rem",
           }}
@@ -168,16 +273,18 @@ function App() {
           </div>
         )}
 
-        {result && (
-          <div
-            style={{
-              background: "#022c22",
-              borderRadius: "12px",
-              padding: "1rem",
-              border: "1px solid #064e3b",
-            }}
+{result && (
+  <div
+    style={{
+      background: "#022c22",
+      borderRadius: "12px",
+      padding: "1rem",
+      border: "1px solid #064e3b",
+    }}
           >
-            <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>Resultado</div>
+            <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>
+              Resultado
+            </div>
             <div
               style={{
                 fontSize: "1.4rem",
