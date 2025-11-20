@@ -31,11 +31,14 @@ function App() {
 
     const url = URL.createObjectURL(f);
 
-    // Da igual si viene del cel o del PC: siempre entramos en modo crop
+    // Da igual si viene de cámara, galería o PC: siempre entramos en modo crop
     setOriginalImageUrl(url);
     setPreview(url);
     setIsCropping(true);
     setFile(null); // aún no tenemos archivo final recortado
+
+    // Reseteamos el value para permitir subir el mismo archivo de nuevo si se quiere
+    e.target.value = "";
   };
 
   const aplicarRecorte = async () => {
@@ -143,19 +146,56 @@ function App() {
             marginBottom: "1rem",
           }}
         >
-          Toma una foto o sube una imagen desde tu computador, recorta el billete
+          Toma una foto, elige una imagen desde la galería de tu celular
+          o sube una imagen desde tu computador. Luego recorta el billete
           y el modelo te dirá si es <b>apto</b> o <b>no apto</b>.
         </p>
 
-        {/* Input de imagen (sirve móvil y PC) */}
+        {/* Opciones de imagen: cámara, galería, PC */}
         {!isCropping && (
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment" // en móvil sugiere cámara; en PC lo ignoran
-            onChange={handleFileChange}
-            style={{ marginBottom: "1rem" }}
-          />
+          <div
+            style={{
+              marginBottom: "1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+              fontSize: "0.85rem",
+            }}
+          >
+            <div>
+              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                📷 Tomar foto (cámara del celular)
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment" // en móvil sugiere cámara; en PC se ignora
+                onChange={handleFileChange}
+              />
+            </div>
+
+            <div>
+              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                🖼️ Elegir desde galería (celular)
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </div>
+
+            <div>
+              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                💻 Subir imagen desde el PC
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+              />
+            </div>
+          </div>
         )}
 
         {/* Zona de recorte */}
@@ -256,7 +296,7 @@ function App() {
           {loading ? "Analizando..." : "Analizar billete"}
         </button>
 
-        {error && ( 
+        {error && (
           <div
             style={{
               background: "#7f1d1d",
@@ -279,6 +319,7 @@ function App() {
               padding: "1rem",
               border: "1px solid #064e3b",
             }}
+
           >
             <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>
               Resultado
