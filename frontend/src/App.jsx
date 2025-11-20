@@ -6,7 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL; // viene de .env.local
 
 function App() {
   const [file, setFile] = useState(null);           // archivo final (recortado)
-  const [preview, setPreview] = useState(null);     // preview actual (original o recortado)
+  const [preview, setPreview] = useState(null);     // preview (original o recortado)
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,17 +26,16 @@ function App() {
     const f = e.target.files[0];
     if (!f) return;
 
-    // Limpiar estado previo
     setResult(null);
     setError(null);
 
     const url = URL.createObjectURL(f);
 
-    // Guardamos la imagen original para recortar
+    // Da igual si viene del cel o del PC: siempre entramos en modo crop
     setOriginalImageUrl(url);
     setPreview(url);
-    setIsCropping(true);   // activamos modo recorte
-    setFile(null);         // aún no tenemos archivo final
+    setIsCropping(true);
+    setFile(null); // aún no tenemos archivo final recortado
   };
 
   const aplicarRecorte = async () => {
@@ -49,15 +48,13 @@ function App() {
       const croppedBlob = await getCroppedImg(originalImageUrl, croppedAreaPixels);
 
       const croppedUrl = URL.createObjectURL(croppedBlob);
-      setPreview(croppedUrl);  // mostrar el recorte final
+      setPreview(croppedUrl);
 
-      // Creamos un File desde el blob recortado
       const croppedFile = new File([croppedBlob], "billete_recortado.jpg", {
         type: "image/jpeg",
       });
       setFile(croppedFile);
 
-      // Salimos del modo recorte
       setIsCropping(false);
     } catch (err) {
       console.error(err);
@@ -68,17 +65,14 @@ function App() {
   const fileToBase64 = (f) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => {
-        // incluye "data:image/jpeg;base64,...."
-        resolve(reader.result);
-      };
+      reader.onload = () => resolve(reader.result); // data:image/jpeg;base64,...
       reader.onerror = (err) => reject(err);
       reader.readAsDataURL(f);
     });
 
   const handleSend = async () => {
     if (!file) {
-      setError("Primero toma la foto, recorta el billete y luego analiza.");
+      setError("Primero toma o sube una imagen, recorta el billete y luego analiza.");
       return;
     }
     if (!API_URL) {
@@ -98,9 +92,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          image_base64: base64, // tu backend acepta data:image/... o solo base64
-        }),
+        body: JSON.stringify({ image_base64: base64 }),
       });
 
       if (!resp.ok) {
@@ -144,17 +136,23 @@ function App() {
         <h1 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>
           Clasificador de Billetes
         </h1>
-        <p style={{ fontSize: "0.9rem", color: "#9ca3af", marginBottom: "1rem" }}>
-          Toma una foto del billete, recórtalo para enmarcarlo bien y el modelo te dirá
-          si es <b>apto</b> o <b>no apto</b>.
+        <p
+          style={{
+            fontSize: "0.9rem",
+            color: "#9ca3af",
+            marginBottom: "1rem",
+          }}
+        >
+          Toma una foto o sube una imagen desde tu computador, recorta el billete
+          y el modelo te dirá si es <b>apto</b> o <b>no apto</b>.
         </p>
 
-        {/* Input de imagen */}
+        {/* Input de imagen (sirve móvil y PC) */}
         {!isCropping && (
           <input
             type="file"
             accept="image/*"
-            capture="environment"  // intenta usar cámara trasera en móviles
+            capture="environment" // en móvil sugiere cámara; en PC lo ignoran
             onChange={handleFileChange}
             style={{ marginBottom: "1rem" }}
           />
@@ -173,15 +171,15 @@ function App() {
                 overflow: "hidden",
               }}
             >
-            <Cropper
-              image={originalImageUrl}
-              crop={crop}
-              zoom={zoom}
-              aspect={2.11} // relación REAL del billete chileno (148mm / 70mm)
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-            />
+              <Cropper
+                image={originalImageUrl}
+                crop={crop}
+                zoom={zoom}
+                aspect={2.11} // proporción del billete chileno (148/70)
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
             </div>
             <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
               <input
@@ -273,14 +271,14 @@ function App() {
           </div>
         )}
 
-{result && (
-  <div
-    style={{
-      background: "#022c22",
-      borderRadius: "12px",
-      padding: "1rem",
-      border: "1px solid #064e3b",
-    }}
+        {result && (
+          <div
+            style={{
+              background: "#022c22",
+              borderRadius: "12px",
+              padding: "1rem",
+              border: "1px solid #064e3b",
+            }}
           >
             <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>
               Resultado
