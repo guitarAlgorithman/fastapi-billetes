@@ -256,7 +256,7 @@ function App() {
           {loading ? "Analizando..." : "Analizar billete"}
         </button>
 
-        {error && (
+        {error && ( 
           <div
             style={{
               background: "#7f1d1d",
