@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import base64
 from io import BytesIO
+from pathlib import Path  # 👈 NUEVO
 
 from PIL import Image
 
@@ -14,10 +15,10 @@ from torchvision import models, transforms
 # CONFIGURACIÓN
 # ----------------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-MODEL_PATH = "modelo_billetes.pt"  # pon este archivo en la misma carpeta
 
-# OJO: este orden debe coincidir con train_dataset.classes
-CLASS_NAMES = ["apto", "no_apto"]
+# Ruta del modelo: en la MISMA carpeta que main.py
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "modelo_billetes.pt"  # 👈 IMPORTANTE
 
 # Transformaciones IGUALES a las de validación/inferencia
 infer_transforms = transforms.Compose([
@@ -94,17 +95,35 @@ def test_imagen_base64(data: ImageBase64):
 # ----------------------------
 # MODELO
 # ----------------------------
-def load_model(weights_path: str):
+def load_model(weights_path: Path):
+    """
+    Carga el modelo ResNet18 desde el archivo exportado.
+    Soporta:
+    - Formato nuevo: {"state_dict": ..., "classes": [...]}
+    - Formato viejo: state_dict a secas
+    """
+    checkpoint = torch.load(weights_path, map_location=DEVICE)
+
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        state_dict = checkpoint["state_dict"]
+        classes = checkpoint.get("classes", ["apto", "no_apto"])
+    else:
+        state_dict = checkpoint
+        classes = ["apto", "no_apto"]
+
     model = models.resnet18(weights=None)
     num_features = model.fc.in_features
-    model.fc = nn.Linear(num_features, 2)  # 2 clases: apto / no_apto
-    state_dict = torch.load(weights_path, map_location=DEVICE)
+    model.fc = nn.Linear(num_features, len(classes))
     model.load_state_dict(state_dict)
     model.to(DEVICE)
     model.eval()
-    return model
 
-def predict_pil_image(img: Image.Image, model: torch.nn.Module):
+    print(f"[MODELO] ResNet18 cargado desde {weights_path}")
+    print(f"[MODELO] Clases: {classes}")
+    return model, classes
+
+
+def predict_pil_image(img: Image.Image, model: torch.nn.Module, class_names):
     x = infer_transforms(img).unsqueeze(0).to(DEVICE)
 
     with torch.no_grad():
@@ -112,17 +131,18 @@ def predict_pil_image(img: Image.Image, model: torch.nn.Module):
         probs = torch.softmax(outputs, dim=1)[0]
         conf, pred_idx = torch.max(probs, dim=0)
 
-    label = CLASS_NAMES[pred_idx.item()]
+    label = class_names[pred_idx.item()]
     return label, float(conf.item())
 
 
 # Cargar el modelo UNA VEZ al arrancar
 try:
-    model = load_model(MODEL_PATH)
-    print(f"[MODELO] Cargado correctamente desde {MODEL_PATH} en {DEVICE}")
+    model, CLASS_NAMES = load_model(MODEL_PATH)  # 👈 ahora viene del checkpoint
+    print(f"[MODELO] Cargado correctamente en {DEVICE}")
 except Exception as e:
     print(f"[ERROR MODELO] No se pudo cargar {MODEL_PATH}: {e}")
     model = None
+    CLASS_NAMES = ["apto", "no_apto"]  # fallback
 
 
 # ----------------------------
@@ -131,7 +151,6 @@ except Exception as e:
 @app.post("/predict-billete-base64")
 def predict_billete_base64(data: ImageBase64):
     if model is None:
-        # Si el modelo no cargó, no sigas
         raise HTTPException(
             status_code=500,
             detail="Modelo no cargado. Revisa que modelo_billetes.pt exista y sea correcto."
@@ -139,9 +158,8 @@ def predict_billete_base64(data: ImageBase64):
 
     img = decode_base64_to_image(data.image_base64)
 
-    label, conf = predict_pil_image(img, model)
+    label, conf = predict_pil_image(img, model, CLASS_NAMES)
 
-    # También lo mostramos en consola para debug
     print(f"[PREDICCIÓN] clase={label}, confianza={conf:.4f}")
 
     return {
