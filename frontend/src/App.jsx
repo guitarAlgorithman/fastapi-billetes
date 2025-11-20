@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import getCroppedImg from "./cropImage";
 
@@ -17,6 +17,16 @@ function App() {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
+  // Detectar si es móvil
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      const ua = navigator.userAgent || navigator.vendor || window.opera;
+      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua));
+    }
+  }, []);
 
   const onCropComplete = useCallback((_, croppedAreaPixels) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -37,7 +47,7 @@ function App() {
     setIsCropping(true);
     setFile(null); // aún no tenemos archivo final recortado
 
-    // Reseteamos el value para permitir subir el mismo archivo de nuevo si se quiere
+    // Permite volver a seleccionar el mismo archivo si el usuario se arrepiente
     e.target.value = "";
   };
 
@@ -146,55 +156,59 @@ function App() {
             marginBottom: "1rem",
           }}
         >
-          Toma una foto, elige una imagen desde la galería de tu celular
-          o sube una imagen desde tu computador. Luego recorta el billete
+          En celular puedes tomar una foto o elegir una imagen desde la galería.
+          En computador puedes subir una imagen desde tu PC. Luego recorta el billete
           y el modelo te dirá si es <b>apto</b> o <b>no apto</b>.
         </p>
 
-        {/* Opciones de imagen: cámara, galería, PC */}
+        {/* Opciones de imagen según dispositivo */}
         {!isCropping && (
           <div
             style={{
               marginBottom: "1rem",
               display: "flex",
               flexDirection: "column",
-              gap: "0.5rem",
+              gap: "0.75rem",
               fontSize: "0.85rem",
             }}
           >
-            <div>
-              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                📷 Tomar foto (cámara del celular)
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment" // en móvil sugiere cámara; en PC se ignora
-                onChange={handleFileChange}
-              />
-            </div>
+            {isMobile ? (
+              <>
+                <div>
+                  <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                    📷 Tomar foto (cámara del celular)
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment" // en móvil sugiere cámara
+                    onChange={handleFileChange}
+                  />
+                </div>
 
-            <div>
-              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                🖼️ Elegir desde galería (celular)
+                <div>
+                  <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                    🖼️ Elegir desde galería
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </>
+            ) : (
+              <div>
+                <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                  💻 Subir imagen desde el PC
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-            </div>
-
-            <div>
-              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                💻 Subir imagen desde el PC
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-              />
-            </div>
+            )}
           </div>
         )}
 
@@ -319,7 +333,6 @@ function App() {
               padding: "1rem",
               border: "1px solid #064e3b",
             }}
-
           >
             <div style={{ fontSize: "0.9rem", color: "#6ee7b7" }}>
               Resultado
@@ -340,8 +353,7 @@ function App() {
                 color: "#a7f3d0",
               }}
             >
-              Confianza:{" "}
-              <b>{(result.confianza * 100).toFixed(2)}%</b>
+              Confianza: <b>{(result.confianza * 100).toFixed(2)}%</b>
             </div>
           </div>
         )}
