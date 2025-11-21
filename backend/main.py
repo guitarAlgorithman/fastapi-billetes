@@ -19,7 +19,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Ruta del modelo: en la MISMA carpeta que main.py
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "modelo_billetes.pt"  # 👈 IMPORTANTE
+MODEL_PATH = BASE_DIR / "modelo_billetes3.pt"  # 👈 IMPORTANTE
 
 # Transformaciones IGUALES a las de validación/inferencia
 infer_transforms = transforms.Compose([
