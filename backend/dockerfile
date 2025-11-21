@@ -5,24 +5,17 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# 1) Instalamos dependencias de sistema mínimas
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# 2) Copiamos requirements del backend e instalamos
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3) Copiamos el backend completo (incluye main.py y modelo_billetes.pt)
+# Copia TODO el backend, incluyendo modelo_billetes3.pt
 COPY backend/ .
 
-# Railway setea $PORT. Si no existe, usamos 8000 (para correr local).
 ENV PORT=8000
-
 EXPOSE 8000
 
-# 4) Usar el PORT de Railway, no hardcodear 8000
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
-# si quieres ser más explícito:
-# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
