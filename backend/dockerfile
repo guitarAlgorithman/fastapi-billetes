@@ -5,15 +5,17 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+# Dependencias del sistema
 RUN apt-get update && \
     apt-get install -y --no-install-recommends build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
+# Copiar requirements DESDE la carpeta donde está el Dockerfile
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia TODO el backend, incluyendo modelo_billetes3.pt
-COPY backend/ .
+# Copiar TODO el backend (incluye main.py y todos los modelos .pt)
+COPY . .
 
 ENV PORT=8000
 EXPOSE 8000
