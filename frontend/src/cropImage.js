@@ -1,4 +1,3 @@
-// src/cropImage.js
 function createImage(url) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -19,17 +18,7 @@ export default async function getCroppedImg(imageSrc, croppedAreaPixels) {
   canvas.width = width;
   canvas.height = height;
 
-  ctx.drawImage(
-    image,
-    x,
-    y,
-    width,
-    height,
-    0,
-    0,
-    width,
-    height
-  );
+  ctx.drawImage(image, x, y, width, height, 0, 0, width, height);
 
   return new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -40,8 +29,7 @@ export default async function getCroppedImg(imageSrc, croppedAreaPixels) {
         }
         resolve(blob);
       },
-      "image/jpeg",
-    
+      "image/jpeg"
     );
   });
 }

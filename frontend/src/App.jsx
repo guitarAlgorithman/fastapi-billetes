@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Cropper from "react-easy-crop";
+import getCroppedImg from "./cropImage";
 
-const API_URL = import.meta.env.VITE_API_URL; // viene de .env.local
+const API_URL = import.meta.env.VITE_API_URL;
 
 function App() {
-  const [file, setFile] = useState(null);           // archivo seleccionado
-  const [preview, setPreview] = useState(null);     // preview de la imagen
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -12,11 +14,24 @@ function App() {
   // Detectar si es móvil
   const [isMobile, setIsMobile] = useState(false);
 
+  // Estados crop
+  const [isCropping, setIsCropping] = useState(false);
+  const [originalImageUrl, setOriginalImageUrl] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
   useEffect(() => {
     if (typeof navigator !== "undefined") {
       const ua = navigator.userAgent || navigator.vendor || window.opera;
-      setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua));
+      setIsMobile(
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)
+      );
     }
+  }, []);
+
+  const onCropComplete = useCallback((_, areaPixels) => {
+    setCroppedAreaPixels(areaPixels);
   }, []);
 
   const handleFileChange = (e) => {
@@ -27,24 +42,53 @@ function App() {
     setError(null);
 
     const url = URL.createObjectURL(f);
-    setPreview(url);
-    setFile(f);
 
-    // Permite volver a seleccionar el mismo archivo si el usuario repite
+    // Entramos a crop SIEMPRE que se sube/toma una imagen
+    setOriginalImageUrl(url);
+    setPreview(url);
+    setIsCropping(true);
+    setFile(null);
+
     e.target.value = "";
+  };
+
+  const aplicarRecorte = async () => {
+    try {
+      if (!originalImageUrl || !croppedAreaPixels) {
+        setError("No se pudo obtener el área de recorte.");
+        return;
+      }
+
+      const croppedBlob = await getCroppedImg(
+        originalImageUrl,
+        croppedAreaPixels
+      );
+
+      const croppedUrl = URL.createObjectURL(croppedBlob);
+      setPreview(croppedUrl);
+
+      const croppedFile = new File([croppedBlob], "billete_recortado.jpg", {
+        type: "image/jpeg",
+      });
+      setFile(croppedFile);
+      setIsCropping(false);
+    } catch (err) {
+      console.error(err);
+      setError("Error al recortar la imagen.");
+    }
   };
 
   const fileToBase64 = (f) =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result); // data:image/jpeg;base64,...
+      reader.onload = () => resolve(reader.result);
       reader.onerror = (err) => reject(err);
       reader.readAsDataURL(f);
     });
 
   const handleSend = async () => {
     if (!file) {
-      setError("Primero toma o sube una imagen y luego analiza.");
+      setError("Primero toma o sube una imagen, recorta el billete y luego analiza.");
       return;
     }
     if (!API_URL) {
@@ -61,9 +105,7 @@ function App() {
 
       const resp = await fetch(`${API_URL}/predict-billete-base64`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image_base64: base64 }),
       });
 
@@ -116,61 +158,111 @@ function App() {
           }}
         >
           En celular puedes tomar una foto o elegir una imagen desde la galería.
-          En computador puedes subir una imagen desde tu PC. Luego el modelo te dirá
-          si el billete es <b>apto</b> o <b>no apto</b>.
+          En computador puedes subir una imagen desde tu PC. Luego recorta el billete
+          y el modelo te dirá si es <b>apto</b> o <b>no apto</b>.
         </p>
 
-        {/* Opciones de imagen según dispositivo */}
-        <div
-          style={{
-            marginBottom: "1rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
-            fontSize: "0.85rem",
-          }}
-        >
-          {isMobile ? (
-            <>
-              <div>
-                <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                  📷 Tomar foto (cámara del celular)
+        {/* Inputs SOLO cuando no estás cropeando */}
+        {!isCropping && (
+          <div
+            style={{
+              marginBottom: "1rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              fontSize: "0.85rem",
+            }}
+          >
+            {isMobile ? (
+              <>
+                <div>
+                  <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                    📷 Tomar foto (cámara)
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileChange}
+                  />
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment" // en móvil sugiere cámara
-                  onChange={handleFileChange}
-                />
-              </div>
 
+                <div>
+                  <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
+                    🖼️ Elegir desde galería
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleFileChange} />
+                </div>
+              </>
+            ) : (
               <div>
                 <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                  🖼️ Elegir desde galería
+                  💻 Subir imagen desde el PC
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                />
+                <input type="file" accept="image/*" onChange={handleFileChange} />
               </div>
-            </>
-          ) : (
-            <div>
-              <div style={{ marginBottom: "0.25rem", color: "#9ca3af" }}>
-                💻 Subir imagen desde el PC
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
+            )}
+          </div>
+        )}
+
+        {/* Zona crop */}
+        {isCropping && originalImageUrl && (
+          <div style={{ marginBottom: "1rem" }}>
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: 300,
+                background: "#000",
+                borderRadius: "12px",
+                overflow: "hidden",
+              }}
+            >
+              <Cropper
+                image={originalImageUrl}
+                crop={crop}
+                zoom={zoom}
+                aspect={2.11}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
               />
             </div>
-          )}
-        </div>
 
-        {/* Preview de la imagen seleccionada */}
-        {preview && (
+            <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
+              <input
+                type="range"
+                min={1}
+                max={3}
+                step={0.1}
+                value={zoom}
+                onChange={(e) => setZoom(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+            </div>
+
+            <button
+              onClick={aplicarRecorte}
+              style={{
+                marginTop: "0.75rem",
+                width: "100%",
+                padding: "0.6rem",
+                borderRadius: "999px",
+                border: "none",
+                fontSize: "0.95rem",
+                fontWeight: "600",
+                cursor: "pointer",
+                background: "#22c55e",
+                color: "#111827",
+              }}
+            >
+              Usar recorte
+            </button>
+          </div>
+        )}
+
+        {/* Preview final solo si no estás en crop */}
+        {preview && !isCropping && (
           <div
             style={{
               marginBottom: "1rem",
@@ -193,10 +285,10 @@ function App() {
           </div>
         )}
 
-        {/* Botón de análisis */}
+        {/* Botón análisis */}
         <button
           onClick={handleSend}
-          disabled={loading || !file}
+          disabled={loading || !file || isCropping}
           style={{
             width: "100%",
             padding: "0.75rem",
@@ -204,8 +296,10 @@ function App() {
             border: "none",
             fontSize: "1rem",
             fontWeight: "600",
-            cursor: loading || !file ? "not-allowed" : "pointer",
-            background: loading || !file ? "#4b5563" : "#22c55e",
+            cursor:
+              loading || !file || isCropping ? "not-allowed" : "pointer",
+            background:
+              loading || !file || isCropping ? "#4b5563" : "#22c55e",
             color: "#111827",
             marginBottom: "1rem",
           }}
