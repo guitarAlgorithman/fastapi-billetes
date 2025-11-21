@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
 import base64
 from io import BytesIO
 from pathlib import Path  # 👈 NUEVO
@@ -73,6 +74,18 @@ def decode_base64_to_image(image_base64: str) -> Image.Image:
 # ----------------------------
 # ENDPOINT DE TEST (SIN MODELO)
 # ----------------------------
+
+
+@app.get("/debug-model")
+def debug_model():
+    return {
+        "device": str(DEVICE),
+        "MODEL_PATH": str(MODEL_PATH),
+        "exists": Path(MODEL_PATH).exists(),
+        "size_bytes": Path(MODEL_PATH).stat().st_size if Path(MODEL_PATH).exists() else None,
+        "class_names": CLASS_NAMES,
+    }
+
 @app.get("/")
 def root():
     return {"mensaje": "API de billetes OK. Usa /test-imagen-base64 o /predict-billete-base64"}
